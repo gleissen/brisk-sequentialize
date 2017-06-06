@@ -242,8 +242,9 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	*/
 	; functor(T, par, 2),
 	  arg(1, T, For),
-	  functor(For, for, 4),
-	  For=for(M, P, S, A),
+	  ( functor(For, for, 6), For=for(M, P, S, Rest, Inv, A)
+      ; functor(For, for, 4), For=for(M,P,S,A), Rest=r, Inv=true
+      ),
 	  arg(2, T, Sym),
 	  Sym=sym(Q, S, B),
 %	  fresh_pred_sym(Proc),
@@ -272,7 +273,7 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  mk_pair(skip, sym(Q,S,C1), T1, Switched),
 	  Gamma1=Gamma,
           substitute_term(P, Proc1, Delta2, Delta3),
-	  append(Delta, [for(P, S ,Delta3)], Delta1),
+	  append(Delta, [for(P, S, Rest, Inv, Delta3)], Delta1),
           (   avl_delete(Proc1, Psi2, Ext0, Psi3) ->
 	      substitute_term(Q, Proc1, Ext0, Ext),
 	      add_external(Psi3, sym(Q, S, seq(Ext)), S, Psi1)
@@ -513,7 +514,7 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 %           T1=par(sym(P, S, C1), A),
            Gamma1=Gamma,
            substitute_term(P, Proc1, Delta2, Delta3),
-           append(Delta, [for(P, S ,Delta3)], Delta1),
+           append(Delta, [for(P, S, r, true, Delta3)], Delta1),
            (   avl_delete(Proc1, Psi2, Ext0, Psi3) ->
 	       substitute_term(P, Proc1, Ext0, Ext),
 	       add_external(Psi3, sym(P, S, seq(Ext)), S, Psi1)
@@ -527,8 +528,9 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	/*
 	for(M, P, S, A): reduce A.
 	*/
-	; functor(T, for, 4),
-	  T=for(M, P, S, A),
+	; ( functor(T, for, 6), T=for(M, P, S, Rest, Inv, A)
+      ; functor(T, for, 4), T=for(M, P, S, A), Rest=r, Inv=true
+      ),
 	  make_instance(Proc),
 	  replace_proc_id(Proc, S, Rho, Rho2),
 	  copy_instantiate(A, P, Proc, A1),
@@ -544,11 +546,11 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  (   Delta2 == [] ->
 	      Delta1=Delta
 	  ;   substitute_term(P, Proc, Delta2, Delta3),
-	      append(Delta, [for(P, S ,Delta3)], Delta1)
+	      append(Delta, [for(P, S, Rest, Inv, Delta3)], Delta1)
 	  ),
 	  (   avl_delete(M, PsiA, Ext0, _) ->
 	      substitute_term(P, Proc, Ext0, Ext),
-	      add_external(Psi, for(M, P, S, seq(Ext)), M, Psi1)
+	      add_external(Psi, for(M, P, S, Rest, Inv, seq(Ext)), M, Psi1)
 	  ;   Psi1=Psi
 	  )
 	/*
@@ -779,7 +781,7 @@ cleanup_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  (   Delta2 == [] ->
 	      Delta1=Delta
 	  ;   substitute_term(P, Proc, Delta2, Delta3),
-	      append(Delta, [for(P, S ,Delta3)], Delta1)
+	      append(Delta, [for(P, S, r, true, Delta3)], Delta1)
 	  ),
 	  Psi1=Psi
 	/*
