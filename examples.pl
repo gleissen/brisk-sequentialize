@@ -2011,6 +2011,13 @@ rewrite_query(par([T,While]),Rem,[], bakst-test2) :- Rem=skip,
 	       recv(a, e_var(d), tyCon(ty__SelfSigned, tyCon(ty__DataNodeResponse)), msg)
 	      ]).
 
+/* Annotations */
+rewrite_query(T, skip, [], simple-annots) :-
+	P1=seq([send(m, e_pid(Q), m), recv(m, e_pid(Q), x)]),
+	P2=seq([recv(P, e_pid(m), id), send(P,e_pid(m),P)]),
+	T=(par([for(m, Q, s, rr, Inv, P1), sym(P, s, P2)])),
+    Inv=true,
+	Name=simple-ping-loop.
 /*
 rewrite_query(par([T1,T2]), T2, Ind, Name) :-
 	Ind=[],
