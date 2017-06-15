@@ -101,9 +101,11 @@ replace_proc_id(Proc1, Proc, Rho, Rho1) :-
 	  (   foreach(Proc-Var-Val, L),
 	      fromto(Rho, RhoIn, RhoOut, Rho1),
 	      param(Proc1)
-	  do  avl_delete(Proc-Var, RhoIn, _, RhoIn1),
-	      substitute_term(Proc1, Proc, Val, Val1),
-	      avl_store(Proc1-Var, RhoIn1, Val1, RhoOut)
+	  do  (   avl_delete(Proc-Var, RhoIn, _, RhoIn1),
+		  substitute_term(Proc1, Proc, Val, Val1),
+		  avl_store(Proc1-Var, RhoIn1, Val1, RhoOut)
+	      ;   RhoIn=RhoOut
+	      )
 	  ).
 
 
@@ -288,7 +290,7 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	; functor(T, par, 2),
 	  arg(1, T, For),
 	  (   functor(For, for, 4),
-	      For=for(M,P,S,A), 
+	      For=for(M,P,S,A)-> 
 	      Inv=true
 	  ;   functor(For, for, 6),
 	      For=for(M,P,S,R,Inv,A) 
@@ -500,7 +502,7 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  ),
 	  rewrite(par([seq([A|C]),D]), Gamma, [], Rho, Psi, skip, Gamma2, DeltaA, RhoA, Psi),
 	  rewrite(par([seq([B|C]),D]), Gamma, [], Rho, Psi, skip, Gamma2, DeltaB, RhoB, Psi)->
-          intersect_avl(RhoA, DeltaB, Rho1),
+          intersect_avl(RhoA, RhoB, Rho1),
 	  append(Delta, [ite(P, Cond, seq(DeltaA), seq(DeltaB))], Delta1),
 	  Gamma1=Gamma2,
 	  T1=par(skip, skip),
@@ -544,7 +546,13 @@ rewrite(T, Gamma, Delta, Rho, Psi, T2, Gamma2, Delta2, Rho2, Psi2) :-
 	    sanity_check([T1, Gamma1, Delta1, Rho1]),
 	    rewrite(T1, Gamma1, Delta1, Rho1, Psi1, T2, Gamma2, Delta2, Rho2, Psi2)
 	).	  
-	
+
+greedy_rewrite(T, Gamma, Delta, Rho, Psi, T2, Gamma2, Delta2, Rho2, Psi2) :-
+	/* Greedily rewrite term. */
+	(   rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1)->
+	    greedy_rewrite(T1, Gamma1, Delta1, Rho1, Psi1, T2, Gamma2, Delta2, Rho2, Psi2)
+	;   T=T2, Gamma=Gamma2, Delta=Delta2, Rho=Rho2, Psi=Psi2 
+	).
 
 cleanup_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	/*
@@ -612,9 +620,10 @@ cleanup_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  make_instance(Proc),
 	  replace_proc_id(Proc, S, Rho, Rho2),
 	  copy_instantiate(A, P, Proc, A1),
-				%	  cleanup_step(A1, Gamma, [], Rho2, Psi, B, Gamma, Delta2, Rho3, Psi) ->
-	  rewrite(A1, Gamma, [], Rho2, Psi, B, Gamma, Delta2, Rho3, Psi) ->
-	  smaller_than(A1, B),
+				%cleanup_step(A1, Gamma, [], Rho2, Psi, B, Gamma, Delta2, Rho3, Psi) ->
+	  greedy_rewrite(A1, Gamma, [], Rho2, Psi, B, Gamma, Delta2, Rho3, _),
+	  %rewrite(A1, Gamma, [], Rho2, Psi, B, Gamma, Delta2, Rho3, Psi),
+	  smaller_than(B, A1)->
 	  substitute_term(P, Proc, B, B1),
 	  T1=sym(P, S, B1),
 	  replace_proc_id(S, Proc, Rho3, Rho4),
