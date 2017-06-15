@@ -612,7 +612,9 @@ cleanup_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  make_instance(Proc),
 	  replace_proc_id(Proc, S, Rho, Rho2),
 	  copy_instantiate(A, P, Proc, A1),
-	  cleanup_step(A1, Gamma, [], Rho2, Psi, B, Gamma, Delta2, Rho3, Psi) ->
+				%	  cleanup_step(A1, Gamma, [], Rho2, Psi, B, Gamma, Delta2, Rho3, Psi) ->
+	  rewrite(A1, Gamma, [], Rho2, Psi, B, Gamma, Delta2, Rho3, Psi) ->
+	  smaller_than(A1, B),
 	  substitute_term(P, Proc, B, B1),
 	  T1=sym(P, S, B1),
 	  replace_proc_id(S, Proc, Rho3, Rho4),
