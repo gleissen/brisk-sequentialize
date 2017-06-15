@@ -61,6 +61,7 @@ send(p, x, type, v)  : send a message of type "type".
  while(p, cond, A)   : process p executes A while cond is true.
  nondet(P, s, A)        : process P is chosen non-deterministically in A.
  assign(p, x, v)     : process p assigns value v to variable x.
+ assign(p, x, q, v)  : process p assigns process q's value v to variable x.
  ite(P, Cond, A, B)  : process p executes A if Cond holds and B, otherwise.
  if(P, Cond, A)      : Short for ite(P, Cond, A, skip).
  pair(x, y)          : pair of values x and y.
@@ -139,7 +140,7 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	; parse_recv(T, Rho, P, Q, Type, X),
 	  avl_member(Q-P, Gamma, [V-Type|Vs]) ->
 	  T1=skip,
-	  append(Delta, [assign(P, X, varOf(Q,V))], Delta1),
+	  append(Delta, [assign(P, X, Q, V)], Delta1),
 	  (   Vs==[] ->
 	      avl_delete(Q-P, Gamma, _, Gamma1)
 	  ;   avl_store(Q-P, Gamma, Vs, Gamma1)
@@ -286,8 +287,12 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	*/
 	; functor(T, par, 2),
 	  arg(1, T, For),
-	  functor(For, for, 4),
-	  For=for(M,P,S,A), 
+	  (   functor(For, for, 4),
+	      For=for(M,P,S,A), 
+	      Inv=true
+	  ;   functor(For, for, 6),
+	      For=for(M,P,S,R,Inv,A) 
+	  ),
 	  arg(2, T, Sym),
 	  Sym=sym(Q, S, B),
 	  make_instance(Proc),
@@ -303,7 +308,7 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  mk_pair(skip, sym(Q,S,C1), T1, Switched),
 	  Gamma1=Gamma,
           substitute_term(P, Proc, Delta2, Delta3),
-	  append(Delta, [for(P, S, seq(Delta3))], Delta1)
+	  append(Delta, [for(M, P, S, R, Inv, seq(Delta3))], Delta1)
 
 	/************************
 	-------------
