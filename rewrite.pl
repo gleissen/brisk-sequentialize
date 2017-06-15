@@ -386,7 +386,7 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 %           T1=par(sym(P, S, C1), A),
            Gamma1=Gamma,
            substitute_term(P, Proc1, Delta2, Delta3),
-           append(Delta, [for(P, S, r, true, seq(Delta3))], Delta1),
+           append(Delta, [for(P, P, S, r, true, seq(Delta3))], Delta1),
            (   avl_delete(Proc1, Psi2, Ext0, Psi3) ->
 	       substitute_term(P, Proc1, Ext0, Ext),
 	       add_external(Psi3, sym(P, S, seq(Ext)), S, Psi1)
@@ -614,7 +614,7 @@ cleanup_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  (   Delta2 == [] ->
 	      Delta1=Delta
 	  ;   substitute_term(P, Proc, Delta2, Delta3),
-	      append(Delta, [for(P, S, r, true, seq(Delta3))], Delta1)
+	      append(Delta, [for(P, P, S, r, true, seq(Delta3))], Delta1)
 	  ),
 	  Psi1=Psi
 	/*
