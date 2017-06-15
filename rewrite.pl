@@ -567,7 +567,14 @@ cleanup_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  ;   throw(assing-to-var(assign(P, X, V)))
 	  ),
 	  Gamma1=Gamma,
-	  Psi1=Psi	
+	  Psi1=Psi
+
+	 /* local */
+	; local(T) ->
+	  T1=skip,
+	  append(Delta, [T], Delta1),
+	  Gamma1=Gamma,
+	  Rho1=Rho
 	/*
 	Case
 	*/
@@ -701,6 +708,11 @@ swap_pid(T, P, Rho, T1, Proc, Rho1) :-
 %	make_instance(Proc),
 %	swap_pid(T, P, Rho, T1, Proc, Rho1).
 
+
+local(T) :-
+	functor(T, Fun, _),
+	Locals=[pre, assert, assume],
+	memberchk(Fun, Locals).
 	
 	
 update_max_delta(T, Delta) :-
