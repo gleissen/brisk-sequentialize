@@ -14,6 +14,7 @@
 
 :- use_module(library(ordsets)).
 :- use_module(library(avl)).
+:- use_module(library(lists)).
 :- use_module(library(terms)).
 :- use_module('lib/misc.pl', [ fresh_pred_sym/1]).
 
@@ -271,6 +272,7 @@ sub_sym_set(P, Proc, P1) :-
 	).
 
 assert_procs(T) :-
+	/*Recursively traverse T and assert proc(P), if process P performs an action.*/
 	(   simple(T) ->
 	    true
 	;   get_proc(T, P),
@@ -282,7 +284,7 @@ assert_procs(T) :-
 	).
 
 get_proc(T, P) :-
-	/*Recursively traverse T and assert proc(P), if process P performs an action.*/
+	/* get process id */
 	(   functor(T, F, _),
 	    ord_member(F, [assign,if,ite,iter,recv,send,while])->
 	    arg(1, T, P)
@@ -290,6 +292,11 @@ get_proc(T, P) :-
 	    arg(1, T, P)
 	;   functor(T, sym, 3),
 	    arg(2, T, P)
+	;   functor(T, seq, 1),
+	    T=seq(L),
+	    select(A, L, _),
+	    get_proc(A, P)
+	    
 	).
 
 

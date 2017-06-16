@@ -147,7 +147,7 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	      avl_delete(Q-P, Gamma, _, Gamma1)
 	  ;   avl_store(Q-P, Gamma, Vs, Gamma1)
 	  ),
-	  here(1),
+%	  here(1),
 	  (
 	   /****************************************
 	  propagate constant from assignment in Q.
@@ -233,6 +233,7 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	%A || B[p*/p],G0,D ~~> skip,G, (D;D1)
 	%----------------------
 	%[A || for(p/{p*})B] ,G,D ~~> skip,G,(D; atomic(D1))
+
 	; functor(T, par, 2),
 	  mk_pair(A, For, T, Switched),
 	  functor(For, for, 4),
@@ -289,12 +290,7 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	*/
 	; functor(T, par, 2),
 	  arg(1, T, For),
-	  (   functor(For, for, 4),
-	      For=for(M,P,S,A)-> 
-	      Inv=true
-	  ;   functor(For, for, 6),
-	      For=for(M,P,S,R,Inv,A) 
-	  ),
+	  parse_for(For, M, P, S, R, Inv, A),
 	  arg(2, T, Sym),
 	  Sym=sym(Q, S, B),
 	  make_instance(Proc),
@@ -334,6 +330,7 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  substitute_term(Proc, P, Rho, Rho2),
 	  mk_pair(A1, sym(Q, SQ, B1), TAB, Switched),
 	  mk_pair(C, skip, TC, Switched),
+%	  here(1),
 	  rewrite(TAB, Gamma, [], Rho2, _, TC, Gamma, Delta2, Rho3, _)->
 	  substitute_term(P, Proc, C, C1),
 	  substitute_term(P, Proc, Rho3, Rho1),
@@ -341,12 +338,54 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  Gamma1=Gamma,
           substitute_term(P, Proc, Delta2, Delta3),
 	  append(Delta, [sym(P, SP, seq(Delta3))], Delta1)
-	
+	/* 
+	-------------
+	For-iter
+	-------------
+	(A[xp/x] || B),G, assume(I) ~~> skip || B,G,(assume(I);D1)
+	-----------------------------------------
+	(for(x:X) A) || B,G,D ~~> B,G,D ○ for(x:X) D1 end
+	*/
+	; functor(T, par, 2),
+	  arg(1, T, For),
+	  arg(2, T, B),
+	  parse_for(For, M, X, Xs, R, Inv, A),
+	  here(1),
+	  make_instance(Index),
+	  copy_instantiate(A, X, Index, A1),
+	  mk_pair(A1, B, A1B, Switched),
+	  mk_pair(skip, B, T1, Switched),
+	  rewrite(A1B, Gamma, [], Rho, Psi, T1, Gamma, Delta2, Rho1, _)->
+	  Gamma1=Gamma,
+	  substitute_term(X, Index, Delta2, Delta3),
+	  append(Delta, [for(M, X, Xs, R, Inv, seq(Delta3))], Delta1)
 
-	
-	/**********************
-	        Loops
-	**********************/
+	/*
+	-------------
+	Sym-Loop
+	-------------
+	p*: A || B [{p*}/P], G, D0 ~~> B, G,(D0; D1)
+	----------------------------
+	Π(p:P) A || B, G,D ~~> B,G,(D; Π(p:P) D1[p/p*])
+	*/
+	; functor(T, par, 2),
+	  arg(1, T, SymA),
+	  arg(2, T, B),
+	  functor(SymA, sym, 3),
+	  SymA=sym(P, S, A),
+	  make_instance(Proc),
+	  copy_instantiate(A, P, Proc, A1),
+	  substitute_term(Proc, P, Rho, Rho2),
+	  substitute_term({Proc}, S, B, B1),
+	  mk_pair(A1, B1, A1B1, Switched),
+	  mk_pair(skip, B1, SkipB1, Switched),
+%	  here(1),
+	  rewrite(A1B1, Gamma, [], Rho2, Psi, SkipB1, Gamma, Delta2, Rho3, _) ->
+	  mk_pair(skip, B, T1, Switched),
+	  substitute_term(P, Proc, Rho3, Rho1),
+	  Gamma1=Gamma,
+          substitute_term(P, Proc, Delta2, Delta3),
+	  append(Delta, [sym(P, S, seq(Delta3))], Delta1)
 	
 	/*
 	================
@@ -359,7 +398,7 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
         par(sym(P, s, B), A) ~~>
         par(sym(P, s, C), A)
         */
-
+/*
         ;  functor(T, par, 2),
            %mk_pair(TB, A, T, Switched),
            %functor(T, par, 2),
@@ -398,7 +437,7 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	       add_external(Psi3, iter(M, S, seq(Ext)), M, Psi1)
 	   ;   Psi1=Psi
 	   )
-
+*/
 	/*
 	Reduce ite
 	*/
@@ -434,22 +473,7 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  Delta1=Delta,
 	  Rho1=Rho,
 	  Psi=Psi1
-        /*
-	par(iter(p, k, A), iter(q, k, B) ): merge two iter loops.
-	*/
-	; functor(T, par, 2),
-	  arg(1, T, TA),
-	  arg(2, T, TB),
-	  functor(TA, iter, 3),
-	  functor(TB, iter, 3),
-	  TA = iter(_, K, A),
-	  TB = iter(_, K, B),
-	  empty_avl(Psi),
-	  mk_pair(A, B, Pair),
-	  rewrite(Pair, Gamma, [], Rho, Psi, par(skip, skip), Gamma, Delta2, _, Psi)->
-	  T1=par(skip, skip),
-	  Gamma1=Gamma, Rho1=Rho, Psi1=Psi,
-	  append(Delta, [iter(env, K, seq(Delta2))], Delta1)
+
         /*
 	par(A, while(P, Cond, B)): exit
 	*/
@@ -480,11 +504,13 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
           mk_pair(A, B, Pair, Switched),
           mk_pair(A1, skip, Pair1, Switched),
 	  empty_avl(Psi),
+          get_proc(A,Q),
+          assert(unfolded(Q, {Q})),
 %          here(1),
 	  rewrite(Pair, Gamma, [], Rho, Psi, Pair1, Gamma, Delta2, Rho1, Psi1),
           check_cond(Cond, P, Rho1)->
 	  T1=par(A1, TB),
-	  append(Delta, [Delta2], Delta1),
+	  append(Delta, [atomic(Delta2)], Delta1),
           Gamma1=Gamma
 	/*
 	par(seq([ite(P, Cond, A, B), C]), D): reduce both par(A,C) and par(B, C) to skip.
@@ -719,7 +745,14 @@ swap_pid(T, P, Rho, T1, Proc, Rho1) :-
 %	make_instance(Proc),
 %	swap_pid(T, P, Rho, T1, Proc, Rho1).
 
-
+parse_for(For, M, P, S, R, Inv, A) :-	
+	(   functor(For, for, 4),
+	    For=for(M, P, S, A)-> 
+	    Inv=true
+	;   functor(For, for, 6),
+	    For=for(M, P, S, R, Inv, A) 
+	).
+	
 local(T) :-
 	functor(T, Fun, _),
 	Locals=[pre, assert, assume],

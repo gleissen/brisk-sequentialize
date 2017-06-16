@@ -204,6 +204,60 @@ rewrite_query(T, skip, _, Name) :-
 	Name=broadcast-reverse-ping.
 
 /*========
+For-repeat
+==========*/
+
+rewrite_query(T, while(q, true, P2), _, Name) :-
+	P1=for(p, _, x, send(p, e_pid(q), p)),
+	P2=recv(q, e_pid(p), id),
+	T=(par([P1,  while(q, true, P2)])),
+	Name=send-for-while.
+
+rewrite_query(T, while(q, true, P2), _, Name) :-
+	P1=for(p, _, x,
+	       seq([
+		    send(p, e_pid(q), p),
+		    send(p, e_pid(q), p)
+		   ])
+	      ),
+        P2=seq([
+		recv(q, e_pid(p), id),
+		recv(q, e_pid(p), id)
+	       ]),
+	T=(par([P1,  while(q, true, P2)])),
+	Name=two-send-for-while.
+
+rewrite_query(T, while(q, true, P2), _, Name) :-
+	P1=for(P, _, x, send(P, e_pid(q), P)),
+	P2=recv(q, e_pid(s), id),
+	T=(par([sym(P,s, P1),  while(q, true, P2)])),
+	Name=send-sym-for-while.
+
+rewrite_query(T, while(q, true, P2), _, Name) :-
+	P1=for(P, _, x,
+	       seq([
+		    send(P, e_pid(q), P),
+		    recv(P, e_pid(q), val)
+		   ])
+	      ),
+	P2=seq([recv(q, e_pid(s), id), send(q, e_var(id), ping)]),
+	T=(par([sym(P,s, P1),  while(q, true, P2)])),
+	Name=ping-sym-for-while.
+
+rewrite_query(T, while(q, true, P2), _, Name) :-
+	P1=for(P, _, x,
+	       seq([
+		    send(P, e_pid(q), P),
+		    recv(P, e_pid(q), val),
+		    send(P, e_pid(q), P),
+		    recv(P, e_pid(q), val)
+		   ])
+	      ),
+	P2=seq([recv(q, e_pid(s), id), send(q, e_var(id), ping)]),
+	T=(par([sym(P,s, P1),  while(q, true, P2)])),
+	Name=ping-twice-sym-for-while.
+
+/*========
 Benchmarks
 ==========*/
 
@@ -260,9 +314,9 @@ rewrite_query(T, skip, _, Name) :-
 	T=(par([P1, sym(P, p, P2)])),
 	Name=two-pc.
 
-/*--------------------------------
-Raft: leader election (simplified)
---------------------------------*/
+/*---------------------
+Raft: leader election
+---------------------*/
 
 rewrite_query(T, skip, _, Name) :-
 	/* followers */
@@ -307,4 +361,62 @@ rewrite_query(T, skip, _, Name) :-
 		if(C, 2*count>card(F), assign(C, isLeader, 1))
 	       ]),
 	T=(par([sym(F, f, P1), sym(C, c, P2)])),
-	Name=simple-raft.
+	Name=raft-leader-election.
+
+/*------
+Conc DB
+------*/
+
+/*-----------
+Encoding
+-------------
+alloc     : 0
+get       : 1
+response  : 2
+failed    : 3
+success   : 4
+------------*/
+
+rewrite_query(T, while(db, true, DB), _, Name) :-
+	Client=for(C, _, x,
+	       seq([
+		    send(C, e_pid(db), pair(C, pair(0, pair(x, v)))),
+		    recv(C, e_pid(db), status),
+		    send(C, e_pid(db), pair(C, pair(1, pair(x, v)))),
+		    recv(C, e_pid(db), vv),
+		    pre(vv == v)
+		   ])
+	      ),
+	DB=seq([
+		recv(db, e_pid(c), pair(id, pair(req, pair(key, val)))),
+		ite(db,
+		    req=0,
+		    ite(db, sel(domain,x)=1,
+			assign(db,response,0),
+			seq([ assign(db,response, pair(1,_)),
+			      assign(db,domain,store(domain,key,1)),
+			      assign(db,db,store(db,key,val))
+			    ])
+		       ),
+		    ite(db,
+			sel(domain,key)=1,
+			seq([
+			     assign(db, tag, 1),
+			     assign(db,  v, sel(db,key)),
+			     assign(db, response, pair(tag, v))
+			    ]),
+			seq([
+			     assign(db, tag, 0),
+			     assign(db,  v, 0),
+			     assign(db, response, pair(tag, v))
+			    ])
+		       )
+		   ),
+		send(db, e_var(id), response)
+	       ]),
+	T=(par([
+		sym(C, c, Client),
+		while(db, true, DB)
+	       ])
+	  ),
+	Name=concdb.
