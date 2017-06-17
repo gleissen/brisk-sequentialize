@@ -473,6 +473,16 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  Delta1=Delta,
 	  Rho1=Rho,
 	  Psi=Psi1
+        /* grouping of sequential statements:
+           group(A,B) := A;B where A;B must be rewritten together.
+	*/
+        ;  functor(T, group, 2),
+           arg(1, T, A),
+           arg(2, T, B),
+           rewrite(seq([A,B]), Gamma, [], Rho, Psi, skip, Gamma1, Delta2, Rho1, Psi1)->
+           T1=skip,
+           append(Delta, Delta2, Delta1)
+
 
         /*
 	par(A, while(P, Cond, B)): exit
