@@ -23,15 +23,8 @@
 
 :- dynamic independent/2,    /* independent(p,q): processes p and q are independent.*/
            unfolded/2,       /* unfolded(p, S): p has been unfolded from S */
-	   talkto/2,         /* talkto(p,q): p and q are communicating, all other procs are external. */
-	   symset/2,         /* symset(p, S): process p belongs to the set of symmetric processes S. */
-	   in_remove/0,
-	   in_for/0,
-	   asserted/1,       /* asserted(cons): cons is valid. */
-	   max_delta/3.      /*
-	                     max_delta(Max, T, Delta): max is the length of delta,
-	                     the longest prefix that occurred in any rewrite-step so far.
-			     */
+	   sent_to/1,        /* sent_to(p): sent to p after unfolding */
+	   asserted/1.       /* asserted(cons): cons is valid. */
 			  
 
 
@@ -270,12 +263,13 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	===========
 	*/
 	; parse_send(T, Rho, P, Q, Type, V),
-	  unfolded(Q, S) ->
+	  unfolded(Q, S)->
 	  T1=send(P, e_pid(Q), Type, V),
 	  Gamma1=Gamma,
 	  Delta1=Delta,
 	  Rho1=Rho,
-	  retractall(unfolded(Proc, S))
+	  retractall(unfolded(_, S)),
+	  assert(sent_to(Q))
 
 	/*
 	================
@@ -303,7 +297,7 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  rewrite(TA, Gamma, [], Rho2, Psi, TC, Gamma, Delta2, Rho3, _)->
 	  substitute_term(P, Proc, Rho3, Rho1),
 	  substitute_term(Q, Proc, C, C1),
-	  mk_pair(skip, sym(Q,S,C1), T1, Switched),
+	  T1=par(skip, sym(Q,S,C1)), 
 	  Gamma1=Gamma,
           substitute_term(P, Proc, Delta2, Delta3),
 	  append(Delta, [for(M, P, S, R, Inv, seq(Delta3))], Delta1)
@@ -334,7 +328,7 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  rewrite(TAB, Gamma, [], Rho2, _, TC, Gamma, Delta2, Rho3, _)->
 	  substitute_term(P, Proc, C, C1),
 	  substitute_term(P, Proc, Rho3, Rho1),
-	  mk_pair(sym(P,SP,C1), skip, T1, Switched),
+	  T1=par(sym(P,SP,C1), skip),
 	  Gamma1=Gamma,
           substitute_term(P, Proc, Delta2, Delta3),
 	  append(Delta, [sym(P, SP, seq(Delta3))], Delta1)
@@ -350,12 +344,12 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  arg(1, T, For),
 	  arg(2, T, B),
 	  parse_for(For, M, X, Xs, R, Inv, A),
-	  here(1),
 	  make_instance(Index),
 	  copy_instantiate(A, X, Index, A1),
 	  mk_pair(A1, B, A1B, Switched),
-	  mk_pair(skip, B, T1, Switched),
-	  rewrite(A1B, Gamma, [], Rho, Psi, T1, Gamma, Delta2, Rho1, _)->
+	  mk_pair(skip, B, SkipB, Switched),
+	  rewrite(A1B, Gamma, [], Rho, Psi, SkipB, Gamma, Delta2, Rho1, _)->
+	  T1=par(skip, B),
 	  Gamma1=Gamma,
 	  substitute_term(X, Index, Delta2, Delta3),
 	  append(Delta, [for(M, X, Xs, R, Inv, seq(Delta3))], Delta1)
@@ -381,63 +375,48 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  mk_pair(skip, B1, SkipB1, Switched),
 %	  here(1),
 	  rewrite(A1B1, Gamma, [], Rho2, Psi, SkipB1, Gamma, Delta2, Rho3, _) ->
-	  mk_pair(skip, B, T1, Switched),
+	  T1=par(skip, B),
 	  substitute_term(P, Proc, Rho3, Rho1),
 	  Gamma1=Gamma,
           substitute_term(P, Proc, Delta2, Delta3),
 	  append(Delta, [sym(P, S, seq(Delta3))], Delta1)
 	
+
 	/*
-	================
-	sym-remove
-	================
-        C<B
-        par(sym(P, s, B), A) ~~>
-        par(par(sym(P, s\{p1}, B), C(p1)), A)
-	---------------------------------------
-        par(sym(P, s, B), A) ~~>
-        par(sym(P, s, C), A)
-        */
-/*
-        ;  functor(T, par, 2),
-           %mk_pair(TB, A, T, Switched),
-           %functor(T, par, 2),
-           arg(1, T, TB),
-	   arg(2, T, A),
-           functor(TB, sym, 3),
-           TB=sym(P, S, B),
-           TB1=par(sym(P, set_minus(S, Proc1), B), C),
-%           mk_pair(TB1, A, T2, Switched),
-           T2=par(TB1, A),
-           \+in_remove,
-           \+in_for,
-	  assert(in_remove),
-           (   rewrite(T, Gamma, [], Rho, Psi, T2, Gamma, Delta2, Rho2, Psi2)
-           ;   retractall(in_remove),
-	       fail
-	   ),
-%           here(1),
-           retractall(in_remove),
-%           rewrite(A1, A, _, _),
-           substitute_term(P, Proc1, C, C1),
-           smaller_than(C1, B) ->
-           clear_talkto,
-           replace_proc_id(S, Proc1, Rho2, Rho1),
-           mk_pair(sym(P, S, C1), A, T1, Switched),
-%           T1=par(sym(P, S, C1), A),
-           Gamma1=Gamma,
-           substitute_term(P, Proc1, Delta2, Delta3),
-           append(Delta, [for(P, P, S, r, true, seq(Delta3))], Delta1),
-           (   avl_delete(Proc1, Psi2, Ext0, Psi3) ->
-	       substitute_term(P, Proc1, Ext0, Ext),
-	       add_external(Psi3, sym(P, S, seq(Ext)), S, Psi1)
-	   ;   get_proc(A, M),
-	       avl_delete(M, Psi2, Ext0, Psi3) ->
-	       substitute_term(P, Proc1, Ext0, Ext),
-	       add_external(Psi3, iter(M, S, seq(Ext)), M, Psi1)
-	   ;   Psi1=Psi
-	   )
-*/
+	----------
+	Sym-Repeat
+	----------
+	G0 := G ∪ unfolded(p*)
+	If G|- unfold_send(p) then P1:={p} and P1:=P o/w.
+	p*: A || B[pp/p,{pp}/P], G0, D0 ~~> pp:A,G, (D0;D1)
+	-----------------------------------------------------
+	Π(p:P) A || for p:P do B, G, D ~~>
+	Π(p:P) A ,G, (D; Σp:P1 (D1[p/pp])) 
+	*/	
+	; functor(T, par, 2),
+	  arg(1, T, SymA),
+	  arg(2, T, ForB),
+	  functor(SymA, sym, 3),
+	  SymA=sym(P, S, A),
+	  ForB=for(Q, P, S, B),
+	  mk_pair(A1, B1, A1B1, Switched),
+	  mk_pair(A1, skip, A1Skip, Switched),
+	  make_instance(Proc),
+	  copy_instantiate(A, P, Proc, A1),
+          copy_instantiate(B, P, Proc, B1),
+	  substitute_term(Proc, P, Rho, Rho2),
+	  assert(unfolded(Proc, S)),
+	  rewrite(A1B1, Gamma, [], Rho2, _, A1Skip, Gamma, Delta2, Rho3, _) ->         
+	  T1=par(SymA, skip),
+          intersect_avl(Rho2, Rho3, Rho1),
+	  Gamma1=Gamma,
+          substitute_term(P, Proc, Delta2, Delta3),
+          (   sent_to(Proc) ->
+	      Delta4=[for(Q,P,S,seq(Delta3))]
+	  ;   Delta4=[for(Q,_,S,nondet(P, S, seq(Delta3)))]
+	  ),
+	  append(Delta, Delta4, Delta1)
+	
 	/*
 	Reduce ite
 	*/
@@ -465,7 +444,7 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  (   avl_fetch(P-Q, Gamma, Vs)
 	  ;   Vs=[]
 	  ),
-	  \+unfolded(P,_),
+	  \+unfolded(Q,_),
 %	  substitute_constants(V, P, Rho, V1),
 	  append(Vs, [V-Type], Vs1),
 	  avl_store(P-Q, Gamma, Vs1, Gamma1),
@@ -483,25 +462,6 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
            T1=skip,
            append(Delta, Delta2, Delta1)
 
-
-        /*
-	par(A, while(P, Cond, B)): exit
-	*/
-	; functor(T, par, 2),
-	  arg(1, T, A),
-	  arg(2, T, TB),
-	  functor(TB, while, 3),
-          TB=while(P, Cond, B),
-          check_cond(Cond, P, Rho),
-          mk_pair(A, B, Pair, Switched),
-          mk_pair(A1, skip, Pair1, Switched),
-	  empty_avl(Psi),
-	  rewrite(Pair, Gamma, [], Rho, Psi, Pair1, Gamma, Delta2, Rho1, Psi1),
-          negate(Cond, NegCond),
-          check_cond(NegCond, P, Rho1)->
-	  T1=par(A1, skip),
-	  append(Delta, [Delta2], Delta1),
-          Gamma1=Gamma
 	/*
 	par(A, while(P, Cond, B)): continue
 	*/
@@ -543,6 +503,25 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  Gamma1=Gamma2,
 	  T1=par(skip, skip),
 	  Psi1=Psi
+
+        /*
+	par(A, while(P, Cond, B)): exit
+	*/
+	; functor(T, par, 2),
+	  arg(1, T, A),
+	  arg(2, T, TB),
+	  functor(TB, while, 3),
+          TB=while(P, Cond, B),
+          check_cond(Cond, P, Rho),
+          mk_pair(A, B, Pair, Switched),
+          mk_pair(A1, skip, Pair1, Switched),
+	  empty_avl(Psi),
+	  rewrite(Pair, Gamma, [], Rho, Psi, Pair1, Gamma, Delta2, Rho1, Psi1),
+          negate(Cond, NegCond),
+          check_cond(NegCond, P, Rho1)->
+	  T1=par(A1, skip),
+	  append(Delta, [Delta2], Delta1),
+          Gamma1=Gamma
 
 	  /*
 	  par(A, B): rewrite ordered pairs.
@@ -668,7 +647,7 @@ cleanup_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  (   Delta2 == [] ->
 	      Delta1=Delta
 	  ;   substitute_term(P, Proc, Delta2, Delta3),
-	      append(Delta, [for(P, P, S, r, true, seq(Delta3))], Delta1)
+	      append(Delta, [for(P, S, r, true, seq(Delta3))], Delta1)
 	  ),
 	  Psi1=Psi
 	/*
@@ -1086,6 +1065,7 @@ cleanup :-
 	retractall(talkto(_,_)),
 	retractall(unfolded(_,_)),
 	retractall(symset(_,_)),
+	retractall(sent_to(_)),
 	retractall(in_remove),
 	retractall(asserted(_)),
 	retractall(max_delta(_,_,_)),
