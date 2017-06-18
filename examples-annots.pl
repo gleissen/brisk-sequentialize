@@ -244,6 +244,7 @@ rewrite_query(T, while(q, true, P2), _, Name) :-
 	T=(par([sym(P,s, P1),  while(q, true, P2)])),
 	Name=ping-sym-for-while.
 
+
 rewrite_query(T, while(q, true, P2), _, Name) :-
 	P1=for(P, _, x,
 	       seq([
@@ -256,6 +257,47 @@ rewrite_query(T, while(q, true, P2), _, Name) :-
 	P2=seq([recv(q, e_pid(s), id), send(q, e_var(id), ping)]),
 	T=(par([sym(P,s, P1),  while(q, true, P2)])),
 	Name=ping-twice-sym-for-while.
+
+/*========
+Sym-repeat
+==========*/
+
+rewrite_query(T, P2, _, Name) :-
+	P1=for(q, P, s,
+	       seq([
+		    send(q, e_pid(P), q),
+		    recv(q, e_pid(P), msg)
+		   ])
+	      ),
+	P2A=seq([recv(P, e_pid(q), id), send(P, e_var(id), ping)]),
+	P2=sym(P, s, while(P, true, P2A)),
+	T=(par([P1,P2])),
+	Name=ping-sym-repeat.
+
+rewrite_query(T, P2, _, Name) :-
+	P1=for(q, P, s,
+	       seq([
+		    recv(q, e_pid(s), id),
+		    send(q, e_var(id), q)
+		   ])
+	      ),
+	P2A=seq([send(P, e_pid(q), P), recv(P, e_pid(q), _)]),
+	P2=sym(P, s, while(P, true, P2A)),
+	T=(par([P1,P2])),
+	Name=reverse-sym-repeat.
+
+rewrite_query(T, P2, _, Name) :-
+	P1A=for(Q, P, p,
+	       seq([
+		    send(Q, e_pid(P), Q),
+		    recv(Q, e_pid(P), msg)
+		   ])
+	      ),
+	P2A=seq([recv(P, e_pid(q), id), send(P, e_var(id), ping)]),
+	P1=sym(Q, q, P1A),
+	P2=sym(P, p, while(P, true, P2A)),
+	T=(par([P1,P2])),
+	Name=sym-sym-ping-repeat.
 
 /*========
 Benchmarks
@@ -419,3 +461,5 @@ rewrite_query(T, while(db, true, DB), _, Name) :-
 	       ])
 	  ),
 	Name=concdb.
+
+
