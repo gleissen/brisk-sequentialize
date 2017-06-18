@@ -372,9 +372,6 @@ Encoding
 -------------
 alloc     : 0
 get       : 1
-response  : 2
-failed    : 3
-success   : 4
 ------------*/
 
 rewrite_query(T, while(db, true, DB), _, Name) :-
@@ -383,8 +380,10 @@ rewrite_query(T, while(db, true, DB), _, Name) :-
 		    send(C, e_pid(db), pair(C, pair(0, pair(x, v)))),
 		    recv(C, e_pid(db), status),
 		    send(C, e_pid(db), pair(C, pair(1, pair(x, v)))),
-		    recv(C, e_pid(db), vv),
-		    pre(vv == v)
+		    group(
+			  recv(C, e_pid(db), vv),
+			  pre(vv == v)
+			 )
 		   ])
 	      ),
 	DB=seq([
