@@ -463,3 +463,88 @@ rewrite_query(T, while(db, true, DB), _, Name) :-
 	Name=concdb.
 
 
+/*------
+Paxos
+------*/
+
+/*-----------
+Encoding
+-------------
+prepare : 0
+accept  : 1
+------------*/
+
+/*
+TODO: - message drops
+*/
+
+rewrite_query(T, sym(A, a, while(A, true, AccLoop)), _, Name) :-
+	Prop=
+	seq([
+	     /* proposal phase */
+	     for(P, A, a,
+	      seq([
+		   send(P, e_pid(A), pair(P, pair(0, pair(t, _)))),
+		   recv(P, e_pid(A), pair(_, pair(w_t, w))),
+		   if(P, w_t>x_t,
+		      seq([
+			   assign(P, x_t, w_t),
+			   assign(P, x, w)
+			   ])
+		     ),
+		   assign(P, ho, set_add(ho, A))
+		  ])
+	     ),
+	     /* acceptance phase */
+
+	    if(P, card(ho)>n/2,
+	       seq([
+		    assign(P, ho, empty_set),
+		    assign(P, ready, 1),
+		    for(P, A, a,
+			seq([
+			     send(P, e_pid(A), pair(P, pair(1, pair(t, x)))),
+			     recv(P, e_pid(A), pair(retType, pair(_, _))),
+			     assign(P, ho, set_add(ho, A))
+			    ])
+		       ),
+		    if(P, 2*ho>n, assign(P, decided, 1))
+		    ])%,
+	      )
+%	    */
+	    ]),
+	Proposers=sym(P, p,
+		      seq([
+			   assign(P, x_t, bottom),
+			   assign(P, ho, empty_set),
+			   assign(P, ready, bottom),
+			   assign(P, decided, bottom),
+			   Prop
+			  ])
+		     ),
+	AccLoop=seq([
+		     recv(A, e_pid(p), pair(id, pair(msgType, pair(seq, val)))),
+		     ite(A, msgType=0,
+			 /* proposal message */
+			      if(A, seq>max, assign(A, max, seq)),
+			 /* acceptance message */
+			 if(A, seq>=max,
+			    seq([
+				 assign(A, w, val),
+				 assign(A, w_t, seq)
+				 ])
+			    )
+			 ),
+		     send(A, e_var(id), pair(1, pair(w_t, w)))
+		    ]),
+	Acceptors=sym(A, a,
+		      seq([
+			   assign(A, max, bottom),
+			   assign(A, w, bottom),
+			   assign(A, w_t, bottom),
+			   while(A, true, AccLoop)
+			  ])
+		     ),
+			 
+	T=(par([Proposers,Acceptors])),
+	Name=paxos.

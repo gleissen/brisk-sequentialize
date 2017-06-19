@@ -140,7 +140,6 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	      avl_delete(Q-P, Gamma, _, Gamma1)
 	  ;   avl_store(Q-P, Gamma, Vs, Gamma1)
 	  ),
-%	  here(1),
 	  (
 	   /****************************************
 	  propagate constant from assignment in Q.
@@ -214,7 +213,7 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	      )
 	  )
 
-
+	
 	/**********************
 	        Loops
 	**********************/
@@ -302,6 +301,34 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
           substitute_term(P, Proc, Delta2, Delta3),
 	  append(Delta, [for(M, P, S, R, Inv, seq(Delta3))], Delta1)
 
+	/*
+	par(seq([ite(P, Cond, A, B), C]), D): reduce both par(A,C) and par(B, C) to skip.
+	*/
+	/*TODO: keep assignments in rho that are occur on both branches.*/
+	; functor(T, par, 2),
+	  T=par(TA, D),
+	  (   functor(TA, seq, 1)->
+	      TA=seq([ITE|C]),
+	      functor(ITE, ite, 4),
+	      ITE=ite(P, Cond, A, B)
+	  ;   functor(TA, ite, 4) ->
+	      TA=ite(P, Cond, A, B),
+	      C=[]
+	  ),
+	  mk_pair(seq([A|C]), D, TA0, SwitchedA),
+	  mk_pair(seq([B|C]), D, TB0, SwitchedB),
+	  mk_pair(skip, D, TA1, SwitchedA),
+	  mk_pair(skip, D, TB1, SwitchedB),
+	  rewrite(TA0, Gamma, [], Rho, Psi, TA1, Gamma2, DeltaA, RhoA, _),
+	  rewrite(TB0, Gamma, [], Rho, Psi, TB1, Gamma2, DeltaB, RhoB, _)->
+          intersect_avl(RhoA, RhoB, Rho1),
+	  clean_delta(DeltaA, DeltaA1),
+	  clean_delta(DeltaB, DeltaB1),
+	  append(Delta, [ite(P, Cond, DeltaA1, DeltaB1)], Delta1),
+	  Gamma1=Gamma2,
+	  T1=par(skip, D),
+	  Psi1=Psi
+	
 	/************************
 	-------------
 	Sym-Sym-Remove
@@ -324,8 +351,8 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  substitute_term(Proc, P, Rho, Rho2),
 	  mk_pair(A1, sym(Q, SQ, B1), TAB, Switched),
 	  mk_pair(C, skip, TC, Switched),
-%	  here(1),
-	  rewrite(TAB, Gamma, [], Rho2, _, TC, Gamma, Delta2, Rho3, _)->
+	  rewrite(TAB, Gamma, [], Rho2, _, TC, Gamma, Delta2, Rho3, _),
+	  smaller_than(C,A1)->
 	  substitute_term(P, Proc, C, C1),
 	  substitute_term(P, Proc, Rho3, Rho1),
 	  T1=par(sym(P,SP,C1), skip),
@@ -373,7 +400,6 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  substitute_term({Proc}, S, B, B1),
 	  mk_pair(A1, B1, A1B1, Switched),
 	  mk_pair(skip, B1, SkipB1, Switched),
-%	  here(1),
 	  rewrite(A1B1, Gamma, [], Rho2, Psi, SkipB1, Gamma, Delta2, Rho3, _) ->
 	  T1=par(skip, B),
 	  substitute_term(P, Proc, Rho3, Rho1),
@@ -425,14 +451,8 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  rewrite(A, Gamma, [], Rho, _, skip, Gamma, DeltaA, RhoA, _),
 	  rewrite(B, Gamma, [], Rho, _, skip, Gamma, DeltaB, RhoB, _)->
 	  intersect_avl(RhoA, RhoB, Rho1),
-	  (   DeltaA==[] ->
-	      DeltaA1=skip
-	  ;   DeltaA1=seq(DeltaA)
-	  ),
-	  (   DeltaB==[] ->
-	      DeltaB1=skip
-	  ;   DeltaB1=seq(DeltaB)
-	  ),
+          clean_delta(DeltaA, DeltaA1),
+          clean_delta(DeltaB, DeltaB1),
 	  append(Delta, [ite(P, Cond, DeltaA1, DeltaB1)], Delta1),
 	  T1=skip,
 	  Gamma1=Gamma
@@ -476,33 +496,12 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  empty_avl(Psi),
           get_proc(A,Q),
           assert(unfolded(Q, {Q})),
-%          here(1),
 	  rewrite(Pair, Gamma, [], Rho, Psi, Pair1, Gamma, Delta2, Rho1, Psi1),
           check_cond(Cond, P, Rho1)->
 	  T1=par(A1, TB),
 	  append(Delta, [atomic(Delta2)], Delta1),
           Gamma1=Gamma
-	/*
-	par(seq([ite(P, Cond, A, B), C]), D): reduce both par(A,C) and par(B, C) to skip.
-	*/
-	/*TODO: keep assignments in rho that are occur on both branches.*/
-	; functor(T, par, 2),
-	  T=par(TA, D),
-	  (   functor(TA, seq, 1)->
-	      TA=seq([ITE|C]),
-	      functor(ITE, ite, 4),
-	      ITE=ite(P, Cond, A, B)
-	  ;   functor(TA, ite, 4) ->
-	      TA=ite(P, Cond, A, B),
-	      C=[]
-	  ),
-	  rewrite(par([seq([A|C]),D]), Gamma, [], Rho, Psi, skip, Gamma2, DeltaA, RhoA, Psi),
-	  rewrite(par([seq([B|C]),D]), Gamma, [], Rho, Psi, skip, Gamma2, DeltaB, RhoB, Psi)->
-          intersect_avl(RhoA, RhoB, Rho1),
-	  append(Delta, [ite(P, Cond, seq(DeltaA), seq(DeltaB))], Delta1),
-	  Gamma1=Gamma2,
-	  T1=par(skip, skip),
-	  Psi1=Psi
+
 
         /*
 	par(A, while(P, Cond, B)): exit
@@ -741,7 +740,13 @@ parse_for(For, M, P, S, R, Inv, A) :-
 	;   functor(For, for, 6),
 	    For=for(M, P, S, R, Inv, A) 
 	).
-	
+
+clean_delta(Delta, Delta1) :-
+	(   Delta==[] ->
+	    Delta1=skip
+	;   Delta1=seq(Delta)
+	).
+
 local(T) :-
 	functor(T, Fun, _),
 	Locals=[pre, assert, assume],
@@ -873,7 +878,8 @@ propagate_const(P, X, Rho, X1) :-
 	(   nonvar(X),
 	    /*Process name can't occur as var.*/
 	    X\==P, 
-	    avl_member(P-X, Rho, X2)->
+	    avl_member(P-X, Rho, X2),
+	    \+contains_term(X, X2)->
 	    (   simple(X2) ->
 		X1=X2
 	    ;   compound(X2)->
