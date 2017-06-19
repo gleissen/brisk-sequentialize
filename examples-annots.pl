@@ -393,6 +393,51 @@ rewrite_query(T, skip, _, Name) :-
 	P2=seq([
 		assign(C, count, 0),
 		assign(C, isLeader, 0),
+		for(C, F, f,
+		    seq([
+			 send(C, e_pid(F), pair(C, cterm)),
+			 recv(C, e_pid(F), success),
+			 if(C, success, assign(C, count, count+1))
+			])
+		   ),
+		if(C, 2*count>card(F), assign(C, isLeader, 1))
+	       ]),
+	T=(par([sym(F, f, P1), sym(C, c, P2)])),
+	Name=raft-leader-election-single-loop.
+
+rewrite_query(T, skip, _, Name) :-
+	/* followers */
+	P1=
+	seq([
+	     assign(F, voted, 0),
+	     for(F, _, c,
+		 seq([
+		      recv(F, e_pid(c), pair(id,term)),
+		      if(F, term>cterm,
+			 seq([
+			      assign(F, cterm, term),
+			      assign(F, voted, 0),
+			      assign(F, votedFor, bottom)
+			      ])
+			),
+		      ite(F,
+			 (term>=cterm,implies(voted=1, votedFor=id)),
+			 seq([
+			      assign(F, voted, 1),
+			      assign(F, votedFor, id),
+			      assign(F, success, 1)
+			     ]),
+			  assign(F, success, 0)
+			 ),
+		      
+		      send(F, e_var(id), success)
+		     ])
+		)
+	    ]),
+	/* Candidates */
+	P2=seq([
+		assign(C, count, 0),
+		assign(C, isLeader, 0),
 		for(C, F, f, send(C, e_pid(F), pair(C, cterm))),
 		for(C, _, f,
 		    seq([
