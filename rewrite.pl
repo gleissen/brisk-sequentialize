@@ -499,7 +499,7 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  rewrite(Pair, Gamma, [], Rho, Psi, Pair1, Gamma, Delta2, Rho1, Psi1),
           check_cond(Cond, P, Rho1)->
 	  T1=par(A1, TB),
-	  append(Delta, [atomic(Delta2)], Delta1),
+	  append(Delta, [atomic(seq(Delta2))], Delta1),
           Gamma1=Gamma
 
 
