@@ -5,6 +5,7 @@
 		 get_pairs/2,
 		 get_ord_pairs/2,
 		 substitute_term/4,
+		 substitute_term_guard/4,
 		 substitute_term_avl/4,
 		 format_atom/3,
 		 copy_instantiate/4,
@@ -39,6 +40,22 @@ substitute_term(X1, X, T, T1) :-
 		foreacharg(T1I, T1),
 		param([X,X1])
 	    do  substitute_term(X1, X, TI, T1I)
+	    )
+	;   T1=T
+	).
+
+/* T1=T[X1/X] where terms inside of {} are guarded from substitution. */
+substitute_term_guard(X1, X, T, T1) :-
+	(   T==X ->
+	    T1=X1
+	;   compound(T),
+	    functor(T, Sym, Arity),
+	    Sym\=={}->
+	    functor(T1, Sym, Arity),
+	    (   foreacharg(TI, T),
+		foreacharg(T1I, T1),
+		param([X,X1])
+	    do  substitute_term_guard(X1, X, TI, T1I)
 	    )
 	;   T1=T
 	).

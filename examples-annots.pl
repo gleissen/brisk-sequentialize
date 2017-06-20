@@ -475,7 +475,7 @@ rewrite_query(T, skip, _, Name) :-
 			 if(C, success, assign(C, count, count+1))
 			])
 		   ),
-		if(C, 2*count>card(F), assign(C, isLeader, 1))
+		if(C, 2*count>card(f), assign(C, isLeader, 1))
 	       ]),
 	T=(par([sym(F, f, P1), sym(C, c, P2)])),
 	Name=raft-single-loop.

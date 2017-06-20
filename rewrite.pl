@@ -4,6 +4,7 @@
 :- use_module(library(ordsets)).
 :- use_module('lib/misc.pl', [ format_atom/3, fresh_pred_sym/1,
 			       substitute_term/4,substitute_term_avl/4,
+			       substitute_term_guard/4,
 			       copy_instantiate/4,get_ord_pairs/2,
 			       get_pairs/2,
 			       negate/2, bb_inc/1,
@@ -364,6 +365,7 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  functor(SymB, sym, 3),
 	  SymB=sym(Q, SQ, B),
 	  make_instance(Proc),
+	  here(1),
 	  copy_instantiate(A, P, Proc, A1),
 	  substitute_term({Proc}, SP, B, B1),
 	  substitute_term(Proc, P, Rho, Rho2),
@@ -375,8 +377,9 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  substitute_term(P, Proc, Rho3, Rho1),
 	  T1=par(sym(P,SP,C1), skip),
 	  Gamma1=Gamma,
-          substitute_term(P, Proc, Delta2, Delta3),
-	  append(Delta, [sym(P, SP, seq(Delta3))], Delta1)
+          substitute_term_guard(P, Proc, Delta2, Delta3),
+	  substitute_term(SP, {Proc}, Delta3, Delta4),
+	  append(Delta, [sym(P, SP, seq(Delta4))], Delta1)
 	/* 
 	-------------
 	For-iter
@@ -423,7 +426,8 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  substitute_term(P, Proc, Rho3, Rho1),
 	  Gamma1=Gamma,
           substitute_term(P, Proc, Delta2, Delta3),
-	  append(Delta, [sym(P, S, seq(Delta3))], Delta1)
+          substitute_term(S, {Proc}, Delta3, Delta4),
+	  append(Delta, [sym(P, S, seq(Delta4))], Delta1)
 	
 
 	/*
