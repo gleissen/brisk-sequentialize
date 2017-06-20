@@ -137,6 +137,11 @@ Recursively traverses T and transforms each send S into tag(S, Tag), where Tag i
 	    assert(sym_set(S)),
 	    tag_sends(A, var(P, S), A1),
 	    T1=for(M, P, S, A1)
+	;   functor(T, for, 6) ->
+	    T=for(M, P, S,R,I,A),
+	    assert(sym_set(S)),
+	    tag_sends(A, var(P, S), A1),
+	    T1=for(M, P, S,R,I, A1)
 	;   same_functor(T, T1),
 	    (   foreacharg(Arg, T),
 		foreacharg(Arg1, T1),
