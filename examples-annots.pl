@@ -300,6 +300,35 @@ rewrite_query(T, P2, _, Name) :-
 	Name=sym-sym-ping-repeat.
 
 /*========
+Timeouts
+==========*/
+
+rewrite_query(T, skip, _, Name) :-
+	P1=tick(p, 
+		seq([
+		     send(p, e_pid(q), p),
+		     recv(p, e_pid(q), id)
+		    ])
+	       ),
+	P2=seq([recv(q, e_pid(p), id), send(q, e_pid(p), q)]),
+	T=(par([P1, P2])),
+	Name=single-ping-timeout.
+
+rewrite_query(T, skip, _, Name) :-
+	P1=for(p, Q, q, 
+	       tick(p, 
+		    seq([
+			 send(p, e_pid(Q), p),
+			 recv(p, e_pid(Q), id)
+			])
+		   )
+	      ),
+	P2=seq([recv(Q, e_pid(p), id), send(Q, e_var(id), Q)]),
+	T=(par([P1, sym(Q, q, P2)])),
+	Name=ping-timeout.
+
+
+/*========
 Benchmarks
 ==========*/
 
@@ -393,17 +422,18 @@ rewrite_query(T, skip, _, Name) :-
 	P2=seq([
 		assign(C, count, 0),
 		assign(C, isLeader, 0),
-		for(C, F, f,
+		for(C, F, f, send(C, e_pid(F), pair(C, cterm))),
+		for(C, _, f,
 		    seq([
-			 send(C, e_pid(F), pair(C, cterm)),
-			 recv(C, e_pid(F), success),
+			 recv(C, e_pid(f), success),
 			 if(C, success, assign(C, count, count+1))
 			])
 		   ),
 		if(C, 2*count>card(F), assign(C, isLeader, 1))
 	       ]),
 	T=(par([sym(F, f, P1), sym(C, c, P2)])),
-	Name=raft-leader-election-single-loop.
+	Name=raft.
+
 
 rewrite_query(T, skip, _, Name) :-
 	/* followers */
@@ -438,18 +468,17 @@ rewrite_query(T, skip, _, Name) :-
 	P2=seq([
 		assign(C, count, 0),
 		assign(C, isLeader, 0),
-		for(C, F, f, send(C, e_pid(F), pair(C, cterm))),
-		for(C, _, f,
+		for(C, F, f,
 		    seq([
-			 recv(C, e_pid(f), success),
+			 send(C, e_pid(F), pair(C, cterm)),
+			 recv(C, e_pid(F), success),
 			 if(C, success, assign(C, count, count+1))
 			])
 		   ),
 		if(C, 2*count>card(F), assign(C, isLeader, 1))
 	       ]),
 	T=(par([sym(F, f, P1), sym(C, c, P2)])),
-	Name=raft-leader-election.
-
+	Name=raft-single-loop.
 /*------
 Conc DB
 ------*/
@@ -528,16 +557,20 @@ rewrite_query(T, sym(A, a, while(A, true, AccLoop)), _, Name) :-
 	seq([
 	     /* proposal phase */
 	     for(P, A, a,
-	      seq([
-		   send(P, e_pid(A), pair(P, pair(0, pair(t, _)))),
-		   recv(P, e_pid(A), pair(_, pair(w_t, w))),
-		   if(P, w_t>x_t,
-		      seq([
-			   assign(P, x_t, w_t),
-			   assign(P, x, w)
-			   ])
-		     ),
-		   assign(P, ho, set_add(ho, A))
+		 seq([
+%		      tick(P,
+%			   seq([
+				send(P, e_pid(A), pair(P, pair(0, pair(t, _)))),
+				recv(P, e_pid(A), pair(_, pair(w_t, w))),
+				if(P, w_t>x_t,
+				   seq([
+					assign(P, x_t, w_t),
+					assign(P, x, w)
+				       ])
+				  ),
+				assign(P, ho, set_add(ho, A))
+%			       ])
+%			  )
 		  ])
 	     ),
 	     /* acceptance phase */

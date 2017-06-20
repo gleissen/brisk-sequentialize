@@ -218,6 +218,24 @@ rewrite_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	        Loops
 	**********************/
 
+	/* tick:
+	Assumed to contain a single send/recv pair.
+	All actions under tick are predicated by the receipt of the respecitve message.
+	*/
+	; functor(T, par, 2),
+	  arg(1, T, Tick),
+	  arg(2, T, B),
+	  functor(Tick, tick, 2),
+	  Tick=tick(P, A),
+	  mk_pair(A, B, T0, _),
+	  mk_pair(skip, B, T2, _),
+	  here(1),
+	  rewrite(T0, Gamma, [], Rho, Psi, T2, Gamma, Delta2, Rho1, _)->
+	  T1=par(skip, B),
+	  Gamma1=Gamma,
+	  append(Delta, if(P, nondet, seq(Delta2)), Delta1)
+	  
+	
 	/*===========
 	residual-for
 	===========*/

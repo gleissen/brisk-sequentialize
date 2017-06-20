@@ -286,7 +286,7 @@ assert_procs(T) :-
 get_proc(T, P) :-
 	/* get process id */
 	(   functor(T, F, _),
-	    ord_member(F, [assign,if,ite,iter,recv,send,while])->
+	    ord_member(F, [assign,if,ite,iter,recv,send,while,tick])->
 	    arg(1, T, P)
 	;   functor(T, for, 4)->
 	    arg(1, T, P)
