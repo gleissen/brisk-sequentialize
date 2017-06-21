@@ -14,9 +14,12 @@ main :- prolog_flag(argv, [Fn | _])  ->
         
         /** Do the rewriting **/
         set_output(Null),
-        check_race_freedom(P, P1), rewrite(P1, Rem, X, _), 
+        check_race_freedom(P, P1),
+        !,
+        rewrite(P1, Rem, X, _), 
         set_output(Out),
         
+%%        format('prog(~p,~n ~p,~n ~p,~n ~p).', [Name, Decls, Ensures, X]),
         portray_clause(prog( Name, Decls, Ensures, X )),
 
         halt(0).

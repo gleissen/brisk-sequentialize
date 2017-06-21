@@ -668,7 +668,7 @@ cleanup_step(T, Gamma, Delta, Rho, Psi, T1, Gamma1, Delta1, Rho1, Psi1) :-
 	  (   Delta2 == [] ->
 	      Delta1=Delta
 	  ;   substitute_term(P, Proc, Delta2, Delta3),
-	      append(Delta, [for(_0, P, S, r, true, seq(Delta3))], Delta1)
+	      append(Delta, [for(_0, P, S, r, true, atomic(seq(Delta3)))], Delta1)
 	  ),
 	  Psi1=Psi
 	/*
