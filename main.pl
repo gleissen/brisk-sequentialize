@@ -9,7 +9,7 @@ main :- prolog_flag(argv, [Fn | _])  ->
         ( current_predicate(prog/5), prog( Name, Decls, Ensures, P, Rem ) 
         ; current_predicate(prog/4), prog( Name, Decls, Ensures, P ), Rem=skip
         ),
-        
+       
         current_output(Out), open_null_stream(Null),
         
         /** Do the rewriting **/
@@ -19,7 +19,6 @@ main :- prolog_flag(argv, [Fn | _])  ->
         rewrite(P1, Rem, X, _), 
         set_output(Out),
         
-%%        format('prog(~p,~n ~p,~n ~p,~n ~p).', [Name, Decls, Ensures, X]),
         portray_clause(prog( Name, Decls, Ensures, X )),
 
         halt(0).
