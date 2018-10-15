@@ -1,11 +1,23 @@
-:- use_module('rewrite.pl').
+:- use_module(library(terms)).
+:- use_module(library(process)).
+:- consult([rewrite]).
 
 user:runtime_entry(start) :-
-	prolog_flag(argv, Argv),
-	format('% ~p\n', [Argv]), 
-	(   Argv = [T|_] ->
-	    format('Rewriting term:~p~n',[T]),
-%	    check_race_freedom(T, T1),
-	    rewrite(T, skip, [], _, Delta, _),
-	    format('~p',[Delta])
-	).
+    prolog_flag(argv, [Fn | _])  ->
+       consult([Fn]),
+       ( current_predicate(prog/5), prog( Name, Decls, Ensures, P, Rem )
+       ; current_predicate(prog/4), prog( Name, Decls, Ensures, P ), Rem=skip
+       ),
+
+       current_output(Out), open_null_stream(Null),
+
+       /** Do the rewriting **/
+       set_output(Null),
+       check_race_freedom(P, P1),
+       !,
+       rewrite(P1, Rem, X, _),
+       set_output(Out),
+
+       portray_clause(prog( Name, Decls, Ensures, X )),
+
+       halt(0).
